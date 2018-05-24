@@ -59,10 +59,6 @@ def svm_loss_naive(W, X, y, reg):
   #############################################################################
 
 
-  
-
-
-  print(dW.shape)
   return loss, dW
 
 
@@ -91,18 +87,18 @@ def svm_loss_vectorized(W, X, y, reg):
 
   ## 首先计算得分
   scores = X.dot(W)
-  print(">>> scores.shape:"+str(scores.shape))
+  # print(">>> scores.shape:"+str(scores.shape))
   ## 计算损失
   ## 首先需要知道各个样本真实归类的分数，需要借助y 
   correct_class_score = scores[np.arange(num_train),y]
 
-  print(">>> correct_class_score.shape :" + str(correct_class_score.shape))
-  print(">>> correct_class_score.reshape(-1,1).shape :" + str(correct_class_score.reshape(-1,1).shape))
+  # print(">>> correct_class_score.shape :" + str(correct_class_score.shape))
+  # print(">>> correct_class_score.reshape(-1,1).shape :" + str(correct_class_score.reshape(-1,1).shape))
    ### 注意 max 和 maxium的区别
   ### max() 从一个array中找出最大值
   ### maximum(a,b) 则比较a和b两个元素的大小，返回较大的一个 
   margins = np.maximum(0, scores - correct_class_score.reshape(-1,1) + delta )
-  print(">>> margins.shape:"+str(margins.shape))
+  # print(">>> margins.shape:"+str(margins.shape))
 
 
   ## 此时还需要将margins中每一个样本的正确类别下的margin修改为0
@@ -128,25 +124,25 @@ def svm_loss_vectorized(W, X, y, reg):
   #############################################################################
   ## 首先确定dW的shape,即W的shape
   dW = np.zeros(W.shape)
-  print(">>> dW.shape:"+str(dW .shape))
+  # print(">>> dW.shape:"+str(dW .shape))
   ### dW的计算需要margins的参与
   ## 计算出一个0-1构成的shape如W的矩阵
   # mask = margins > 0 ## True 和 False 构成
   # dW += 
 
   X_mask = np.zeros(margins.shape)
-  print(">>> X_mask.shape:"+str(X_mask.shape))
+  # print(">>> X_mask.shape:"+str(X_mask.shape))
   X_mask[margins > 0] = 1
 
   ## 对于每一个样本，计算 margin > 0 的非正确类别数目
   incorrect_count = np.sum(X_mask,axis =1)
-  print(">>> incorrect_count.shape:"+str(incorrect_count.shape))
+  # print(">>> incorrect_count.shape:"+str(incorrect_count.shape))
   ## 这一部分计算时参与到 j = y[i]，也就是说计算梯度时，处理预测分类和正确分类相同的情况
   ## 所以，
   X_mask[np.arange(num_train),y] = -incorrect_count
-  print(">>> X_mask[0] == "+str(X_mask[0]))
+  # print(">>> X_mask[0] == "+str(X_mask[0]))
   dW = X.T.dot(X_mask)
-  print(">>> dW.shape:"+str(dW .shape))
+  # print(">>> dW.shape:"+str(dW .shape))
 
   dW = dW/num_train + reg*W
   #############################################################################
