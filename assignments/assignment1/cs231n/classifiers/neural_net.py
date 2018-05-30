@@ -104,12 +104,12 @@ class TwoLayerNet(object):
     #loss = -log(loss_part1 / loss_part2)
     #loss = np.sum(loss)/N + 0.5*reg*(np.sum(W1*W1) + np.sum(W2*W2))
 
+    #scores = scores - np.max(scores,axis=1,keepdims=True)
     exp_scores = np.exp(scores)
-    probs = exp_scores / np.sum(scores,axis=1,keepdims=True)
+    probs = exp_scores / np.sum(exp_scores,axis=1,keepdims=True)  ## ERROR LOG: scores -> exp_scores 问题解决
     correct_logprobs = -np.log(probs[range(N),y])
-
-    data_loss = np.sum(correct_logprobs)
-    reg_loss = 0.5 * reg * ( np.sum(W1 * W1) + np.sum(W2 * W2) )
+    data_loss = np.sum(correct_logprobs) /  N
+    reg_loss = 0.5 * reg * np.sum(W1 * W1) + 0.5 * reg * np.sum(W2 * W2) 
     loss = data_loss + reg_loss
 
     ## 参考答案
@@ -138,7 +138,7 @@ class TwoLayerNet(object):
     dscores /= N
 
     grads['W2'] = np.dot(a1.T, dscores)
-    grads['b2'] = np.sum(dscores ,axis=0 , keepdims=True)
+    grads['b2'] = np.sum(dscores ,axis=0 )
     grads['W2'] += reg * W2
 
 
@@ -147,7 +147,7 @@ class TwoLayerNet(object):
     dhidden[a1 <= 0] = 0
 
     grads['W1'] = np.dot(X.T, dhidden)
-    grads['b1'] = np.sum(dscores ,axis=0 , keepdims=True)
+    grads['b1'] = np.sum(dhidden ,axis=0)
     grads['W1'] += reg * W1
 
 
@@ -214,10 +214,10 @@ class TwoLayerNet(object):
       # stored in the grads dictionary defined above.                         #
       #########################################################################
       ## 更新参数
-      self.params['W1'] +=  -learning_rate*grads['W1']
-      self.params['b1'] +=  -learning_rate*grads['b1']
-      self.params['W2'] +=  -learning_rate*grads['W2']
-      self.params['b2'] +=  -learning_rate*grads['b2']
+      self.params['W1'] +=  -learning_rate * grads['W1']
+      self.params['b1'] +=  -learning_rate * grads['b1']
+      self.params['W2'] +=  -learning_rate * grads['W2']
+      self.params['b2'] +=  -learning_rate * grads['b2']
 
       #########################################################################
       #                             END OF YOUR CODE                          #
@@ -263,10 +263,10 @@ class TwoLayerNet(object):
     ###########################################################################
     # TODO: Implement this function; it should be VERY simple!                #
     ###########################################################################
-    z1 = W.dot*(self.params['W1']) + self.params['b1']
-    a1 = np/maximum(z1,0)
+    z1 = X.dot(self.params['W1']) + self.params['b1']
+    a1 = np.maximum(z1,0)
     scores = a1.dot(self.params['W2']) +self.params['b2'] 
-    y_pred = np.max(score,axis=1)
+    y_pred = np.max(scores,axis=1)
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
