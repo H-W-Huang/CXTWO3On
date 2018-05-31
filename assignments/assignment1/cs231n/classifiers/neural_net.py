@@ -78,7 +78,7 @@ class TwoLayerNet(object):
     y1 = X.dot(W1) + b1
     ### 此处的激活函数使用ReLU
     a1 = np.maximum(0,y1)
-    y2 = y1.dot(W2) + b2
+    y2 = a1.dot(W2) + b2
     scores = y2
     #############################################################################
     #                              END OF YOUR CODE                             #
@@ -164,7 +164,6 @@ class TwoLayerNet(object):
             batch_size=200, verbose=False):
     """
     Train this neural network using stochastic gradient descent.
-
     Inputs:
     - X: A numpy array of shape (N, D) giving training data.
     - y: A numpy array f shape (N,) giving training labels; y[i] = c means that
@@ -179,6 +178,7 @@ class TwoLayerNet(object):
     - batch_size: Number of training examples to use per step.
     - verbose: boolean; if true print progress during optimization.
     """
+
     num_train = X.shape[0]
     iterations_per_epoch = max(num_train / batch_size, 1)
 
@@ -235,7 +235,7 @@ class TwoLayerNet(object):
         val_acc_history.append(val_acc)
 
         # Decay learning rate
-        learning_rate *= learning_rate_decay
+        learning_rate *= learning_rate_decay   ## 注意这里使用了衰退率
 
     return {
       'loss_history': loss_history,
@@ -266,7 +266,9 @@ class TwoLayerNet(object):
     z1 = X.dot(self.params['W1']) + self.params['b1']
     a1 = np.maximum(z1,0)
     scores = a1.dot(self.params['W2']) +self.params['b2'] 
-    y_pred = np.max(scores,axis=1)
+    
+    ## y_pred = np.max(scores,axis=1)  !! WRONG !!
+    y_pred = np.argmax(scores,axis=1)  
     ###########################################################################
     #                              END OF YOUR CODE                           #
     ###########################################################################
