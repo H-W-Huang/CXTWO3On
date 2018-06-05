@@ -53,7 +53,7 @@ class ThreeLayerConvNet(object):
         # **the width and height of the input are preserved**. Take a look at      #
         # the start of the loss() function to see how that happens.                #                           
         ############################################################################
-        pass
+        self.params['W1'] = 
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 from builtins import range
 import numpy as np
 
@@ -106,6 +107,8 @@ def relu_backward(dout, cache):
     return dx
 
 
+
+## BN归一化实现--前向
 def batchnorm_forward(x, gamma, beta, bn_param):
     """
     Forward pass for batch normalization.
@@ -175,7 +178,20 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Referencing the original paper (https://arxiv.org/abs/1502.03167)   #
         # might prove to be helpful.                                          #
         #######################################################################
-        pass
+        ### 训练阶段
+        ### 首先计算单个batch的均值和方差
+        x_mean = np.mean(x,axis=0)
+        x_var = np.var(x,axis=0)
+        ### 对每一个x进行归一化
+        x_hat = (x - x_mean) / np.sqrt( x_var + eps)
+        ### 更新 running_mean 然后 running_var
+        running_mean = momentum * running_mean + ( 1 - momentum ) * x_mean
+        running_var = momentum * running_var + ( 1 - momentum ) * x_var
+        ## 计算输出结果out
+        out = gamma * x_hat + beta
+        ## 存储所有的中间计算结果
+        cache = ( x, gamma, beta, x_hat, x_mean, x_var, eps )
+
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -186,7 +202,9 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # then scale and shift the normalized data using gamma and beta.      #
         # Store the result in the out variable.                               #
         #######################################################################
-        pass
+        x_hat = (x - running_mean) / np.sqrt( running_var + eps)
+        out = gamma * x_hat + beta
+        
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
