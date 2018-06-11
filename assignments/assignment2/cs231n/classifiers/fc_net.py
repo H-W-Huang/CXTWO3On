@@ -289,7 +289,7 @@ class FullyConnectedNet(object):
         
         ## 有 self.num_layers 参数可用
         ## 则遍历所有的 hidden_layers,以层为单位来思考整个过程
-        for i in xrange(len(self.num_layers) - 1):
+        for i in xrange(self.num_layers - 1):
             current_W = self.params['W'+str(i+1)]
             current_b = self.params['b'+str(i+1)]
             ## 正向传播，同时顺带计算relu的结果
@@ -300,9 +300,12 @@ class FullyConnectedNet(object):
         ## 计算最后的输出
         out,cache = affine_forward(
                         current_input,
-                        self.params['W'+str(len(self.num_layers))],
-                        self.params['b'+str(len(self.num_layers))]
+                        self.params['W'+str(self.num_layers)],
+                        self.params['b'+str(self.num_layers)]
                     )
+
+        ### 这里和上边的最后一个编号之间可能不连续
+        caches[self.num_layers ] = cache
         scores = out
 
 
@@ -333,10 +336,24 @@ class FullyConnectedNet(object):
         ## 首先是计算损失
         loss, dout = softmax_loss(scores,y)
 
+        loss = loss + 0.5 * self.reg * np.sum( self.params['W%d'%(self.num_layers)] * self.params['W%d'%(self.num_layers)] )
+
+        ## 反向传播和正向传播一样，分离出最后的HiddenLayer和OutputLayer之间的计算，其他层间的在一个循环里完成
+        ### 首先是输出层和最后一个隐层之间的梯度
+        current_dx, dw, db = affine_backward(dout, caches[self.num_layers])
+        grads['W%d'%(self.num_layers)] = dw + self.reg * self.params['W%d'%(self.num_layers)]
+        grads['b%d'%(self.num_layers)] = db
+
+        for i in xrange(self.num_layers -1):
+            current_index = self.num_layers -1 -i
+            current_dx, dw, db = affine_relu_backward(current_dx, caches[current_index-1])
+            grads['W%d'%(current_index)] = dw + self.reg * self.params['W%d'%(current_index)]
+            grads['b%d'%(current_index)] = db
+            loss = loss + 0.5 * self.reg * np.sum( self.params['W%d'%(current_index)] * self.params['W%d'%(current_index)] )
 
 
-
-
+ 
+        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
