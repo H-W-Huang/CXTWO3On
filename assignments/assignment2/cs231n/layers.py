@@ -28,9 +28,9 @@ def affine_forward(x, w, b):
     ###########################################################################
     #pass
     N = x.shape[0]
-    print(x.shape)
+    # print(x.shape)
     D = np.prod(x.shape[1:])
-    print(D)
+    # print(D)
     x_ = x.reshape(N,-1)
     out = x_.dot(w) +b
     ###########################################################################
