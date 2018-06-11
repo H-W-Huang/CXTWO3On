@@ -27,6 +27,10 @@ def affine_forward(x, w, b):
     # will need to reshape the input into rows.                               #
     ###########################################################################
     pass
+    N = x.shape[0]
+    #D = np.prod(x.shape[1:])
+    x_ = x.reshape(N,-1)
+    out = x_.dot(w) +b
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -55,7 +59,15 @@ def affine_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
-    pass
+    
+    dx = dout,dot(w.T)
+    ## 少了一部，这里的dx维度需要分散开来
+    dx = np.reshape(*dx.shape)
+    dw = (x.T).dot(dout)
+
+    db = np.sum(dout,axis=0)
+
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -77,7 +89,7 @@ def relu_forward(x):
     ###########################################################################
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
-    pass
+    out = x * (x >= 0 )
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -100,7 +112,7 @@ def relu_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
-    pass
+    dx = (x >= 0) * dout
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -180,16 +192,39 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         #######################################################################
         ### 训练阶段
         ### 首先计算单个batch的均值和方差
-        x_mean = np.mean(x,axis=0)
+        # x_mean = np.mean(x,axis=0)
+        # x_var = np.var(x,axis=0)
+        # ### 对每一个x进行归一化
+        # x_hat = (x - x_mean) / np.sqrt( x_var + eps)
+
+        # ### 更新 running_mean 然后 running_var
+        # running_mean = momentum * running_mean + ( 1 - momentum ) * x_mean
+        # running_var = momentum * running_var + ( 1 - momentum ) * x_var
+        # ## 计算输出结果out
+        # out = gamma * x_hat + beta
+        # ## 存储所有的中间计算结果
+        # cache = ( x, gamma, beta, x_hat, x_mean, x_var, eps )
+
+        ### 按照计算图一步步计算的实现如下：
+        ### 一共有 10 个步骤
+        x_mean = 1./N * np.sum(x,axis = 0)
+        # x_mean = np.mean(x,axis=0)
+        # print(">>>>>")
+        # print(x_mean == np.mean(x,axis=0))
+        x_mu = x - x_mean 
+        x_mu_square = np.square(x_mu)
+        x_var = 1./N * np.sum(x_mu_square,axis=0)
         x_var = np.var(x,axis=0)
-        ### 对每一个x进行归一化
-        x_hat = (x - x_mean) / np.sqrt( x_var + eps)
-        ### 更新 running_mean 然后 running_var
+        x_var_plus_eps = x_var + eps
+        x_sqrt_var = np.sqrt(x_var_plus_eps)
+        x_sqrt_var_i = 1. / x_sqrt_var
+        # x_hat = x_mu / x_sqrt_var_i ##错了
+        x_hat = x_mu * x_sqrt_var_i
+        x_hat_gamma = gamma * x_hat
+        # out = x_hat + beta  ## ERROR
+        out = x_hat_gamma + beta
         running_mean = momentum * running_mean + ( 1 - momentum ) * x_mean
         running_var = momentum * running_var + ( 1 - momentum ) * x_var
-        ## 计算输出结果out
-        out = gamma * x_hat + beta
-        ## 存储所有的中间计算结果
         cache = ( x, gamma, beta, x_hat, x_mean, x_var, eps )
 
         #######################################################################
@@ -242,7 +277,54 @@ def batchnorm_backward(dout, cache):
     # Referencing the original paper (https://arxiv.org/abs/1502.03167)       #
     # might prove to be helpful.                                              #
     ###########################################################################
-    pass
+    #pass
+    N,D = dout.shape
+    x, gamma, beta, x_hat, x_mean, x_var, eps = cache
+
+    ### 按照计算图，从输出开始，一步步进行反向传播
+    # x_mean = 1.0/N * np.sum(x,axis = 0)
+    x_mu = x - x_mean 
+    # x_mu_square = np.square(x_mu)
+    # x_var = 1.0/N * np.sum(x_mu_square,axis=0)
+    x_var_plus_eps = x_var + eps
+    x_sqrt_var = np.sqrt(x_var_plus_eps)
+    x_sqrt_var_i = 1.0 / x_sqrt_var
+    # x_hat = x_mu / x_sqrt_var_i
+    # x_hat_gamma = gamma * x_hat
+    # out = x_hat_gamma + beta    
+
+    ## 已知 dout的shape为 (N, D) 
+    # gamma: Scale parameter of shape (D,)
+    # beta: Shift paremeter of shape (D,)
+    ## 均值和方差的shape也是 (D,)
+
+
+    dx_hat_gamma = dout  # (N, D) 
+    dbeta = np.sum(dout,axis = 0) ## 需要保持shape的一致, (D,) 
+    # dgamma = np.sum(dx_hat_gamma.T * x_hat,axis = 0)
+    dgamma = np.sum(dx_hat_gamma * x_hat,axis = 0)  ## 不需要转置？ 不需要，这里是逐元素相乘，我们希望的结果也是（N, D)
+    # print("dx_hat_gamma.shape:"+str(dx_hat_gamma.shape))
+    # print("x_hat.shape:"+str(x_hat.shape))
+    dx_hat = dx_hat_gamma * gamma
+    dx_mu1 = dx_hat * x_sqrt_var_i  ### 来自 x_hat 
+    dx_sqrt_var_i = np.sum(dx_hat * x_mu,axis = 0)
+    dx_sqrt_var = dx_sqrt_var_i * (-1.0) / np.square(x_sqrt_var)
+    dx_var_plus_eps = 0.5 * 1.0 / np.sqrt(x_var_plus_eps) * dx_sqrt_var
+    dx_var = dx_var_plus_eps
+    deps = dx_var_plus_eps
+    dx_mu_square = 1.0/N * np.ones((N,D))  *  dx_var
+    dx_mu2 = 2 * x_mu * dx_mu_square
+    ## 注意均值的shape
+    # dx_mean = (-1) * (dx_mu1 + dx_mu2)
+    dx_mean = (-1) * np.sum((dx_mu1 + dx_mu2),axis = 0)
+    dx_1 = (dx_mu1 + dx_mu2)  ## x_mu = x - x_mean 
+    # dx_2 = 1.0 / N * dx_mean  ## 这样子出来的shape就仅仅是 (D,)
+    dx_2 = 1.0 / N * np.ones((N,D)) * dx_mean
+    dx = dx_1 + dx_2 
+ 
+    ## 注意累加计算咋在求导是的处理
+    ## 以上代码参考自： https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -273,7 +355,48 @@ def batchnorm_backward_alt(dout, cache):
     # should be able to compute gradients with respect to the inputs in a     #
     # single statement; our implementation fits on a single 80-character line.#
     ###########################################################################
-    pass
+    # pass
+    x, gamma, beta, x_hat, x_mean, x_var, eps = cache
+    N,D = dout.shape
+    # x_mean = 1.0/N * np.sum(x,axis = 0)
+    # x_mu = x - x_mean 
+    # x_mu_square = np.square(x_mu)
+    # x_var = 1.0/N * np.sum(x_mu_square,axis=0)
+    # x_var_plus_eps = x_var + eps
+    # x_sqrt_var = np.sqrt(x_var_plus_eps)
+    # x_sqrt_var_i = 1.0 / x_sqrt_var
+    # x_hat = x_mu / x_sqrt_var_i
+    # x_hat_gamma = gamma * x_hat
+    # out = x_hat_gamma + beta    
+    ## 合并步骤
+    # dx_hat_gamma = dout  # (N, D) 
+    # dbeta = np.sum(dout,axis = 0) 
+    # # dgamma = np.sum(dx_hat_gamma.T * x_hat,axis = 0)
+    # dgamma = np.sum(dx_hat_gamma * x_hat,axis = 0)  
+    # dx_hat = dx_hat_gamma * gamma
+    # dx_mu1 = dx_hat * x_sqrt_var_i  
+    # dx_sqrt_var_i = np.sum(dx_hat * x_mu,axis = 0)
+    # dx_sqrt_var = dx_sqrt_var_i * (-1.0) / np.square(x_sqrt_var)
+    # dx_var_plus_eps = 0.5 * 1.0 / np.sqrt(x_var_plus_eps) * dx_sqrt_var
+    # dx_var = dx_var_plus_eps
+    # deps = dx_var_plus_eps
+    # dx_mu_square = 1.0/N * np.ones((N,D))  *  dx_var
+    # dx_mu2 = 2 * x_mu * dx_mu_square
+    # # dx_mean = (-1) * (dx_mu1 + dx_mu2)
+    # dx_mean = (-1) * np.sum((dx_mu1 + dx_mu2),axis = 0)
+    # dx_1 = (dx_mu1 + dx_mu2)  ## x_mu = x - x_mean 
+    # # dx_2 = 1.0 / N * dx_mean  
+    # dx_2 = 1.0 / N * np.ones((N,D)) * dx_mean
+    # dx = dx_1 + dx_2 
+
+    dgamma = np.sum(dout * x_hat,axis = 0)
+    dbeta = np.sum(dout,axis = 0)
+
+    dx_hat =  dout * gamma
+    dx_var = 0.5 * 1.0 / np.sqrt(x_var + eps) * np.sum(dx_hat * (x - x_mean) ,axis = 0) * (-1.0) / np.square(np.sqrt(x_var + eps))
+    dx_mean =  (-1) * np.sum((dx_hat * (1.0 / np.sqrt(x_var + eps)) + 2 * (x - x_mean) * 1.0/N * np.ones((N,D)) *  dx_var),axis = 0)
+    dx = (dx_hat * (1.0 / np.sqrt(x_var + eps))  + 2 * ( x - x_mean ) *  1.0/N * np.ones((N,D))  *  dx_var) +  1.0 / N * dx_mean 
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -391,7 +514,11 @@ def dropout_forward(x, dropout_param):
         # TODO: Implement training phase forward pass for inverted dropout.   #
         # Store the dropout mask in the mask variable.                        #
         #######################################################################
-        pass
+        # pass
+        # 根据输入数据的shape生成对应shape的掩码
+        mask =  ( np.random.rand(*x.shape) < p ) / p
+        out = x * mask 
+
         #######################################################################
         #                           END OF YOUR CODE                          #
         #######################################################################
@@ -399,7 +526,8 @@ def dropout_forward(x, dropout_param):
         #######################################################################
         # TODO: Implement the test phase forward pass for inverted dropout.   #
         #######################################################################
-        pass
+        # pass
+        out = x
         #######################################################################
         #                            END OF YOUR CODE                         #
         #######################################################################
@@ -426,7 +554,7 @@ def dropout_backward(dout, cache):
         #######################################################################
         # TODO: Implement training phase backward pass for inverted dropout   #
         #######################################################################
-        pass
+        dx = dout * mask
         #######################################################################
         #                          END OF YOUR CODE                           #
         #######################################################################
