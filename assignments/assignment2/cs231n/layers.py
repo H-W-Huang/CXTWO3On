@@ -26,9 +26,11 @@ def affine_forward(x, w, b):
     # TODO: Implement the affine forward pass. Store the result in out. You   #
     # will need to reshape the input into rows.                               #
     ###########################################################################
-    pass
+    #pass
     N = x.shape[0]
-    #D = np.prod(x.shape[1:])
+    print(x.shape)
+    D = np.prod(x.shape[1:])
+    print(D)
     x_ = x.reshape(N,-1)
     out = x_.dot(w) +b
     ###########################################################################
@@ -59,12 +61,15 @@ def affine_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
-    
-    dx = dout,dot(w.T)
-    ## 少了一部，这里的dx维度需要分散开来
-    dx = np.reshape(*dx.shape)
-    dw = (x.T).dot(dout)
+    N = x.shape[0]
 
+    dx = dout.dot(w.T)
+    ## 少了一部，这里的dx维度需要分散开来
+    # print(">>>>>:"+str(dx.shape))
+    dx = dx.reshape(*x.shape)  ## dx 的shape永远和x一致
+
+    ## 此处还需要把x的shape 从 (N,d1,d2,...,dn)转换为(N,D)
+    dw = (x.reshape(N,-1).T).dot(dout)
     db = np.sum(dout,axis=0)
 
 

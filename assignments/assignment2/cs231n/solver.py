@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 from __future__ import print_function, division
 from future import standard_library
 standard_library.install_aliases()
@@ -38,8 +39,8 @@ class Solver(object):
     data = {
       'X_train': # training data
       'y_train': # training labels
-      'X_val': # validation data
-      'y_val': # validation labels
+      'X_val'  : # validation data
+      'y_val'  : # validation labels
     }
     model = MyAwesomeModel(hidden_size=100, reg=10)
     solver = Solver(model, data,
@@ -258,12 +259,16 @@ class Solver(object):
         """
         Run optimization to train the model.
         """
+
+        ### 参与训练的样本数
         num_train = self.X_train.shape[0]
+        ### 单个epoch的迭代次数
         iterations_per_epoch = max(num_train // self.batch_size, 1)
+        ### 整个训练过程中的迭代次数
         num_iterations = self.num_epochs * iterations_per_epoch
 
         for t in range(num_iterations):
-            self._step()
+            self._step()  ## 此时就会进行参数更新了
 
             # Maybe print training loss
             if self.verbose and t % self.print_every == 0:
@@ -272,6 +277,7 @@ class Solver(object):
 
             # At the end of every epoch, increment the epoch counter and decay
             # the learning rate.
+            # epoch末，降低学习率，计数+1
             epoch_end = (t + 1) % iterations_per_epoch == 0
             if epoch_end:
                 self.epoch += 1

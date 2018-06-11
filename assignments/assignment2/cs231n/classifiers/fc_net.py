@@ -1,3 +1,4 @@
+# -*- coding: UTF-8 -*-
 from builtins import range
 from builtins import object
 import numpy as np
@@ -47,7 +48,19 @@ class TwoLayerNet(object):
         # and biases using the keys 'W1' and 'b1' and second layer                 #
         # weights and biases using the keys 'W2' and 'b2'.                         #
         ############################################################################
-        pass
+        #pass
+
+        ## 初始化
+        D = input_dim
+        H = hidden_dim
+        C = num_classes
+        # self.params['W1'] = np.random.normal(0.0,weight_scale,(D,H))
+        self.params['W1'] = weight_scale *  np.random.randn(D,H)
+        self.params['b1'] = np.zeros(H)  ## 此处不是D而是 H
+        # self.params['W2'] = np.random.normal(0.0,weight_scale,(H,C))
+        self.params['W2'] = weight_scale *  np.random.randn(H,C)
+        self.params['b2'] = np.zeros(C)
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -77,7 +90,12 @@ class TwoLayerNet(object):
         # TODO: Implement the forward pass for the two-layer net, computing the    #
         # class scores for X and storing them in the scores variable.              #
         ############################################################################
-        pass
+        #pass
+        ### 首先是前向传播
+        z1, cache1_1 = affine_forward(X,self.params['W1'],self.params['b1'])
+        a1, cache1_2 = relu_forward(z1)
+        z2, cache2_1 = affine_forward(a1,self.params['W2'],self.params['b2'])
+        scores = z2
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -97,7 +115,22 @@ class TwoLayerNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        #pass
+        loss, dout = softmax_loss(z2, y)
+        ## 开始反向传播
+        ## 各个梯度的命名依据正向传播的命名
+        da1,dw2,db2 = affine_backward(dout,cache2_1)  ## out, cache2_1 = affine_forward(a1,self.params['W2'],self.params['b2'])
+        dz1 = relu_backward(da1,cache1_2)             #  a1, cache1_2 = relu_forward(z1)
+        dx,dw1,db1  = affine_backward(dz1,cache1_1)   #  z1, cache1_1 = affine_forward(X,self.params['W1'],self.params['b1'])
+
+
+        # 最终的 loss 和 梯度 还需要进行正则化
+        grads['W2'] = dw2 +  self.reg * self.params['W2'] 
+        grads['b2'] = db2
+        grads['W1'] = dw1 +  self.reg * self.params['W1'] 
+        grads['b1'] = db1 
+        loss = loss + 0.5 * self.reg * ( np.sum( self.params['W1'] * self.params['W1'] ) +  np.sum( self.params['W2'] * self.params['W2'] ) )
+        
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -165,6 +198,31 @@ class FullyConnectedNet(object):
         # parameters should be initialized to zeros.                               #
         ############################################################################
         pass
+
+        ### 初始化参数
+        D = input_dim
+        C = num_classes
+
+        hidden_nums = len(hidden_dims)
+        first_dim = D
+        second_dim = None
+
+        ### 此处还需要考虑BN的情况
+        for i in xrange(len(hidden_dims)):
+            param_w_name = 'W'+str(i+1) 
+            param_b_name = 'b'+str(i+1) 
+            second_dim = hidden_dims[i]
+            self.params[param_w_name] = weight_scale * np.random.rand(first_dim,second_dim)
+            self.params[param_b_name] = np.zeros(second_dim)
+            first_dim = second_dim
+
+        ## 最后的连接层和输出层直接的参数
+        param_w_name = 'W'+str(len(hidden_dims)+1)
+        param_b_name = 'b'+str(len(hidden_dims)+1)
+        self.params[param_w_name] = weight_scale * np.random.rand(first_dim,C)
+        self.params[param_b_name] = np.zeros(C)
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -223,7 +281,31 @@ class FullyConnectedNet(object):
         # self.bn_params[1] to the forward pass for the second batch normalization #
         # layer, etc.                                                              #
         ############################################################################
-        pass
+        
+        ## 目前没有实现dropout和BN的情况
+
+        current_input = X
+        caches = {}  
+        
+        ## 有 self.num_layers 参数可用
+        ## 则遍历所有的 hidden_layers,以层为单位来思考整个过程
+        for i in xrange(len(self.num_layers) - 1):
+            current_W = self.params['W'+str(i+1)]
+            current_b = self.params['b'+str(i+1)]
+            ## 正向传播，同时顺带计算relu的结果
+            out,cache = affine_relu_forward(current_input,current_W,current_b)
+            current_input = out
+            caches[i] = cache
+
+        ## 计算最后的输出
+        out,cache = affine_forward(
+                        current_input,
+                        self.params['W'+str(len(self.num_layers))],
+                        self.params['b'+str(len(self.num_layers))]
+                    )
+        scores = out
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -247,6 +329,14 @@ class FullyConnectedNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         pass
+
+        ## 首先是计算损失
+        loss, dout = softmax_loss(scores,y)
+
+
+
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
