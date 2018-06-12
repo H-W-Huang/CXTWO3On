@@ -216,7 +216,7 @@ class FullyConnectedNet(object):
             self.params[param_w_name] = weight_scale * np.random.randn(first_dim,second_dim)
             self.params[param_b_name] = np.zeros(second_dim)
             ## 如果使用了BN，还需要对BN的参数进行初始化
-            if self.normalization == 'batchnorm':
+            if self.normalization == 'batchnorm' or self.normalization == 'layernorm':
                 self.params['gamma%d'%(i+1)] = np.ones(second_dim)
                 self.params['beta%d'%(i+1)] = np.zeros(second_dim)
             first_dim = second_dim
@@ -314,15 +314,21 @@ class FullyConnectedNet(object):
                 # print(cache[1].shape)
                 # print(cache[2].shape)                
             elif self.normalization == 'layernorm':
-                pass
+                out1, cache1 = affine_forward(current_input,current_W,current_b)
+                ## bn
+                out2, cache2 = layernorm_forward(out1,self.params['gamma%d'%(i+1)],self.params['beta%d'%(i+1)],self.bn_params[i])
+                ## relu
+                out,cache3 = relu_forward(out2)
+                cache = (cache1,cache2,cache3)
             else:
                 ## 正向传播，同时顺带计算relu的结果
                 out,cache = affine_relu_forward(current_input,current_W,current_b)
 
             ## 是否使用Dropout
             if self.use_dropout :
-                out,cache = dropout_forward(out,self.dropout_param)
-
+                # print('using dropout:'+ str(self.dropout_param))
+                out,dropout_cache = dropout_forward(out,self.dropout_param) ## 整合dropout的cache
+                cache = (dropout_cache,cache)
             current_input = out
             caches[i] = cache
             # 此处最终只有caches[0]和caches[1]
@@ -378,26 +384,37 @@ class FullyConnectedNet(object):
         for i in xrange(self.num_layers -1):
             current_index = self.num_layers -1 -i
             loss = loss + 0.5 * self.reg * np.sum( self.params['W%d'%(current_index)] * self.params['W%d'%(current_index)] )
+            caches_being_used = caches[current_index-1]
+
             # current_dx, dw, db =  None
             ## 开始分支
             ## 首先是dropout
             if self.use_dropout:
-                current_dx = dropout_backward(current_dx,caches[current_index-1])
-
+                dropout_cache,caches_being_used = caches_being_used
+                current_dx = dropout_backward(current_dx,dropout_cache) ## 分离出dropout的cache
+                # print('dropout backward finish!')
             if self.normalization == 'batchnorm':
-                cache = caches[current_index-1]
+                cache = caches_being_used
                 current_dx  = relu_backward(current_dx, cache[2])
                 current_dx, dgamma, dbeta = batchnorm_backward(current_dx, cache[1])
                 current_dx,dw,db = affine_backward(current_dx, cache[0])
             elif self.normalization == 'layernorm':
-                pass
-            else:    
-                current_dx, dw, db = affine_relu_backward(current_dx, caches[current_index-1])
+                cache = caches_being_used
+                current_dx  = relu_backward(current_dx, cache[2])
+                current_dx, dgamma, dbeta = layernorm_backward(current_dx, cache[1])
+                current_dx,dw,db = affine_backward(current_dx, cache[0])
+            else:
+                fc_cache, relu_cache = caches_being_used
+                current_dx = relu_backward(current_dx, relu_cache)
+                # print('>>>'+str(fc_cache))
+                current_dx, dw, db = affine_backward(current_dx, fc_cache)
+
+                # current_dx, dw, db = affine_relu_backward(current_dx, caches_being_used)
             
             grads['W%d'%(current_index)] = dw + self.reg * self.params['W%d'%(current_index)]
             grads['b%d'%(current_index)] = db
 
-            if self.normalization == 'batchnorm':
+            if self.normalization == 'batchnorm' or self.normalization == 'layernorm':
                 grads['gamma%d'%(current_index)] = dgamma
                 grads['beta%d'%(current_index)]  = dbeta
         

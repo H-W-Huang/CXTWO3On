@@ -61,6 +61,7 @@ def affine_backward(dout, cache):
     ###########################################################################
     # TODO: Implement the affine backward pass.                               #
     ###########################################################################
+    # print(type(x))
     N = x.shape[0]
 
     dx = dout.dot(w.T)
@@ -95,6 +96,7 @@ def relu_forward(x):
     # TODO: Implement the ReLU forward pass.                                  #
     ###########################################################################
     out = x * (x >= 0 )
+    # print('>>>>>>'+str(type(out)))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -118,6 +120,7 @@ def relu_backward(dout, cache):
     # TODO: Implement the ReLU backward pass.                                 #
     ###########################################################################
     dx = (x >= 0) * dout
+    # print('dx type:'+str(type(dx)))
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -444,6 +447,18 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
     pass
+
+    ### 和BN不同，此时不需要对训练和测试阶段做不同处理
+    ### 两个阶段的操作是一样的
+    ## 对整个层所有参数计算 均值
+    x_mean = np.mean(x)
+    x_var = np.var(x)
+
+    x_hat = (x - x_mean) / np.sqrt(x_var + eps) ## 正则化完成
+
+    out = gamma * x_hat + beta
+    cache = (x, gamma, beta, x_mean, x_var, x_hat, eps )
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -475,6 +490,19 @@ def layernorm_backward(dout, cache):
     # still apply!                                                            #
     ###########################################################################
     pass
+
+    N,D = dout.shape
+    x, gamma, beta, x_mean, x_var, x_hat, eps  = cache 
+
+    dgamma = np.sum(dout * x_hat,axis = 0)
+    dbeta = np.sum(dout,axis = 0)
+
+    dx_hat =  dout * gamma
+    dx_var = 0.5 * 1.0 / np.sqrt(x_var + eps) * np.sum(dx_hat * (x - x_mean) ,axis = 0) * (-1.0) / np.square(np.sqrt(x_var + eps))
+    dx_mean =  (-1) * np.sum((dx_hat * (1.0 / np.sqrt(x_var + eps)) + 2 * (x - x_mean) * 1.0/N * np.ones((N,D)) *  dx_var),axis = 0)
+    dx = (dx_hat * (1.0 / np.sqrt(x_var + eps))  + 2 * ( x - x_mean ) *  1.0/N * np.ones((N,D))  *  dx_var) +  1.0 / N * dx_mean 
+
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################

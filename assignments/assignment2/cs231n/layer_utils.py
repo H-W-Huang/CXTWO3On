@@ -27,6 +27,7 @@ def affine_relu_backward(dout, cache):
     """
     fc_cache, relu_cache = cache
     da = relu_backward(dout, relu_cache)
+    # print('da type:'+str(type(da)))
     dx, dw, db = affine_backward(da, fc_cache)
     return dx, dw, db
 
