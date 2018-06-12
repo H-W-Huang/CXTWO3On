@@ -207,7 +207,7 @@ class FullyConnectedNet(object):
         first_dim = D
         second_dim = None
 
-        ### 此处还需要考虑BN的情况
+
         for i in xrange(len(hidden_dims)):
             param_w_name = 'W'+str(i+1) 
             param_b_name = 'b'+str(i+1) 
@@ -215,6 +215,10 @@ class FullyConnectedNet(object):
             # self.params[param_w_name] = weight_scale * np.random.rand(first_dim,second_dim)  ## ERROR! rand -> randn
             self.params[param_w_name] = weight_scale * np.random.randn(first_dim,second_dim)
             self.params[param_b_name] = np.zeros(second_dim)
+            ## 如果使用了BN，还需要对BN的参数进行初始化
+            if self.normalization == 'batchnorm':
+                self.params['gamma%d'%(i+1)] = np.ones(second_dim)
+                self.params['beta%d'%(i+1)] = np.zeros(second_dim)
             first_dim = second_dim
 
         ## 最后的连接层和输出层直接的参数
@@ -287,7 +291,6 @@ class FullyConnectedNet(object):
 
         current_input = X
         caches = {}  
-        
         ## 有 self.num_layers 参数可用
         ## 则遍历所有的 hidden_layers,以层为单位来思考整个过程
         for i in xrange(self.num_layers - 1):
@@ -295,8 +298,31 @@ class FullyConnectedNet(object):
             # print('processing '+str(i))
             current_W = self.params['W'+str(i+1)]
             current_b = self.params['b'+str(i+1)]
-            ## 正向传播，同时顺带计算relu的结果
-            out,cache = affine_relu_forward(current_input,current_W,current_b)
+            out = None
+            cache = None
+            # 分支, 是否使用 BN
+            if self.normalization=='batchnorm':
+                ## 使用BN
+                ## affine
+                out1, cache1 = affine_forward(current_input,current_W,current_b)
+                ## bn
+                out2, cache2 = batchnorm_forward(out1,self.params['gamma%d'%(i+1)],self.params['beta%d'%(i+1)],self.bn_params[i])
+                ## relu
+                out,cache3 = relu_forward(out2)
+                cache = (cache1,cache2,cache3)
+                # print(np.array(cache1).shape)
+                # print(cache[1].shape)
+                # print(cache[2].shape)                
+            elif self.normalization == 'layernorm':
+                pass
+            else:
+                ## 正向传播，同时顺带计算relu的结果
+                out,cache = affine_relu_forward(current_input,current_W,current_b)
+
+            ## 是否使用Dropout
+            if self.use_dropout :
+                out,cache = dropout_forward(out,self.dropout_param)
+
             current_input = out
             caches[i] = cache
             # 此处最终只有caches[0]和caches[1]
@@ -351,13 +377,29 @@ class FullyConnectedNet(object):
 
         for i in xrange(self.num_layers -1):
             current_index = self.num_layers -1 -i
-            current_dx, dw, db = affine_relu_backward(current_dx, caches[current_index-1])
+            loss = loss + 0.5 * self.reg * np.sum( self.params['W%d'%(current_index)] * self.params['W%d'%(current_index)] )
+            # current_dx, dw, db =  None
+            ## 开始分支
+            ## 首先是dropout
+            if self.use_dropout:
+                current_dx = dropout_backward(current_dx,caches[current_index-1])
+
+            if self.normalization == 'batchnorm':
+                cache = caches[current_index-1]
+                current_dx  = relu_backward(current_dx, cache[2])
+                current_dx, dgamma, dbeta = batchnorm_backward(current_dx, cache[1])
+                current_dx,dw,db = affine_backward(current_dx, cache[0])
+            elif self.normalization == 'layernorm':
+                pass
+            else:    
+                current_dx, dw, db = affine_relu_backward(current_dx, caches[current_index-1])
+            
             grads['W%d'%(current_index)] = dw + self.reg * self.params['W%d'%(current_index)]
             grads['b%d'%(current_index)] = db
-            loss = loss + 0.5 * self.reg * np.sum( self.params['W%d'%(current_index)] * self.params['W%d'%(current_index)] )
 
-
- 
+            if self.normalization == 'batchnorm':
+                grads['gamma%d'%(current_index)] = dgamma
+                grads['beta%d'%(current_index)]  = dbeta
         
         ############################################################################
         #                             END OF YOUR CODE                             #
