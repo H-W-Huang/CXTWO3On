@@ -68,6 +68,14 @@ def sgd_momentum(w, dw, config=None):
     # the next_w variable. You should also use and update the velocity v.     #
     ###########################################################################
     pass
+    momentum = config['momentum']
+    learning_rate = config['learning_rate']
+
+    ##首先计算v
+    v = momentum*v - learning_rate*dw
+    next_w = w + v
+    ## next_w = w - learning_rate*dw + momentum*v
+    ## 参考 http://cs231n.github.io/neural-networks-3/#sgd
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -101,7 +109,15 @@ def rmsprop(w, dw, config=None):
     # in the next_w variable. Don't forget to update cache value stored in    #
     # config['cache'].                                                        #
     ###########################################################################
-    pass
+    # RMSprop改进自 AdaGrad
+    ## AdaGrad 的 grad_squared为： 
+    # grad_squared =  dw * dw
+    grad_squared = config['cache'] 
+    grad_squared = config['decay_rate'] * grad_squared + (1 - config['decay_rate']) * np.square(dw)
+    w = w - config['learning_rate'] * dw / (np.sqrt(grad_squared)+config['epsilon'])
+    next_w = w
+
+    config['cache'] = grad_squared
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -123,6 +139,9 @@ def adam(w, dw, config=None):
     - v: Moving average of squared gradient.
     - t: Iteration number.
     """
+
+    ## 合并了Momentum 和 RMS的思想
+
     if config is None: config = {}
     config.setdefault('learning_rate', 1e-3)
     config.setdefault('beta1', 0.9)
@@ -142,6 +161,26 @@ def adam(w, dw, config=None):
     # using it in any calculations.                                           #
     ###########################################################################
     pass
+
+    ## 每一次 t 都要+1?
+    config['t'] = config['t'] + 1 
+
+    ## 计算第一个动量m （对应于 momentumSGD 中的动量）
+    m = config['beta1'] * config['m'] + (1 - config['beta1']) * dw
+    ## 计算第二个动量v,（对应于 Rmsprop 中的平方根 ）
+    v = config['beta2'] * config['v'] + (1 - config['beta2']) * (np.square(dw))
+
+    ## 对这两个量修正，防止出现一开始更新时，由于第二个动量太小，导致整个移动步长太大，从而导致的可能的不好影像
+    m_unbias = m / ( 1 - config['beta1'] ** config['t'])
+    v_unbias = v / ( 1 - config['beta2'] ** config['t'])
+
+    ## 开始更新参数
+    next_w = w - config['learning_rate'] * m_unbias / ( np.sqrt(v_unbias) + config['epsilon'] )
+
+    ## 更新config中的参数，注意更新的是修正前的数值
+    config['m'] = m
+    config['v'] = v
+    
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################

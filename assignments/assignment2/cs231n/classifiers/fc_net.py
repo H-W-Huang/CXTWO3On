@@ -197,7 +197,7 @@ class FullyConnectedNet(object):
         # beta2, etc. Scale parameters should be initialized to ones and shift     #
         # parameters should be initialized to zeros.                               #
         ############################################################################
-        pass
+        #pass
 
         ### 初始化参数
         D = input_dim
@@ -212,14 +212,15 @@ class FullyConnectedNet(object):
             param_w_name = 'W'+str(i+1) 
             param_b_name = 'b'+str(i+1) 
             second_dim = hidden_dims[i]
-            self.params[param_w_name] = weight_scale * np.random.rand(first_dim,second_dim)
+            # self.params[param_w_name] = weight_scale * np.random.rand(first_dim,second_dim)  ## ERROR! rand -> randn
+            self.params[param_w_name] = weight_scale * np.random.randn(first_dim,second_dim)
             self.params[param_b_name] = np.zeros(second_dim)
             first_dim = second_dim
 
         ## 最后的连接层和输出层直接的参数
         param_w_name = 'W'+str(len(hidden_dims)+1)
         param_b_name = 'b'+str(len(hidden_dims)+1)
-        self.params[param_w_name] = weight_scale * np.random.rand(first_dim,C)
+        self.params[param_w_name] = weight_scale * np.random.randn(first_dim,C)
         self.params[param_b_name] = np.zeros(C)
 
 
@@ -290,12 +291,15 @@ class FullyConnectedNet(object):
         ## 有 self.num_layers 参数可用
         ## 则遍历所有的 hidden_layers,以层为单位来思考整个过程
         for i in xrange(self.num_layers - 1):
+            # notebook中的例子，层数为3
+            # print('processing '+str(i))
             current_W = self.params['W'+str(i+1)]
             current_b = self.params['b'+str(i+1)]
             ## 正向传播，同时顺带计算relu的结果
             out,cache = affine_relu_forward(current_input,current_W,current_b)
             current_input = out
             caches[i] = cache
+            # 此处最终只有caches[0]和caches[1]
 
         ## 计算最后的输出
         out,cache = affine_forward(
@@ -331,12 +335,13 @@ class FullyConnectedNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        #pass
 
         ## 首先是计算损失
         loss, dout = softmax_loss(scores,y)
 
         loss = loss + 0.5 * self.reg * np.sum( self.params['W%d'%(self.num_layers)] * self.params['W%d'%(self.num_layers)] )
+        # print('>>>>>current_index:'+str(self.num_layers))
 
         ## 反向传播和正向传播一样，分离出最后的HiddenLayer和OutputLayer之间的计算，其他层间的在一个循环里完成
         ### 首先是输出层和最后一个隐层之间的梯度
