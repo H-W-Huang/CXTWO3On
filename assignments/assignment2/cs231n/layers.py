@@ -220,6 +220,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         ### 按照计算图一步步计算的实现如下：
         ### 一共有 10 个步骤
         x_mean = 1./N * np.sum(x,axis = 0)
+        print(x_mean.shape)
+        print(x.shape)
         # x_mean = np.mean(x,axis=0)
         # print(">>>>>")
         # print(x_mean == np.mean(x,axis=0))
@@ -1018,9 +1020,10 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     x = x.reshape(N,G,C//G,H,W)  # // 表示整数除,不四舍五入
 
     ## 计算均值
-    x_mean = np.mean(x,axis=(2,3,4))[:,:,None,None,None]
-    # print(x_mean.shape)
-    x_var = np.var(x,axis=(2,3,4))[:,:,None,None,None]
+    x_mean = np.mean(x,axis=(0,1))
+    print(x_mean.shape)
+    # print(x.shape)
+    x_var = np.var(x,axis=(0,1))
 
     x_hat = x - x_mean / np.sqrt(x_var + eps)
 
