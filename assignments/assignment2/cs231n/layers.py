@@ -643,8 +643,8 @@ def conv_forward_naive(x, w, b, conv_param):
     F, _, HH, WW = w.shape ## w的C和x的C是一样的
     P , S = conv_param['pad'], conv_param['stride']
     # 根据公式计算输出结果的shape
-    out_W = (W - WW + 2*P) / S + 1
-    out_H = (H - HH + 2*P) / S + 1
+    out_W = (W - WW + 2*P) // S + 1
+    out_H = (H - HH + 2*P) // S + 1
     ## 构造输出结果的结构
     ## 一张图卷积成 (F,out_H,out_W)的shape，N张就有N个这样的shape
     out = np.zeros((N,F,out_H,out_W))
@@ -668,8 +668,8 @@ def conv_forward_naive(x, w, b, conv_param):
 
     ##  开始运算
     ### 可能这里确实需要先H后W，否则图片会被翻转
-    for i in xrange(out_H):
-        for j in xrange(out_W):
+    for i in range(out_H):
+        for j in range(out_W):
             ## 从 x_pad 中取出需要参与计算的部分
             ## 第一个维度：全取
             ## 第二个维度：全取
@@ -681,7 +681,7 @@ def conv_forward_naive(x, w, b, conv_param):
             x_padded_computed_w_end = j * S + WW
             x_padded_computed = x_padded[:, :, x_padded_computed_h_start:x_padded_computed_h_end ,x_padded_computed_w_start:x_padded_computed_w_end]
             ## 一共有F个卷积核，需要计算F次;对N张图都做这样的运算
-            for f in xrange(F):
+            for f in range(F):
                 ## 单一一张图的计算计算结果为：
                 ### np.sum(x_padded_computed[i] * w[f,:,:,:])
                 result = x_padded_computed *  w[f,:,:,:]
@@ -743,8 +743,8 @@ def conv_backward_naive(dout, cache):
     F, _, HH, WW = w.shape ## w的C和x的C是一样的
     P , S = conv_param['pad'], conv_param['stride']
     # 根据公式计算输出结果的shape
-    out_W = (W - WW + 2 * P) / S + 1
-    out_H = (H - HH + 2 * P) / S + 1
+    out_W = (W - WW + 2 * P) //  S + 1
+    out_H = (H - HH + 2 * P) //  S + 1
 
     x_padded = np.pad(x, ((0,0),(0,0),(P,P),(P,P)), mode='constant')
     ## 同时，还要确定好输出的shape
@@ -761,16 +761,16 @@ def conv_backward_naive(dout, cache):
     db = np.sum(dout,axis = (0,2,3))
 
 
-    for i in xrange(out_H):
-        for j in xrange(out_W):
+    for i in range(out_H):
+        for j in range(out_W):
             x_padded_computed = x_padded[:, :, i * S :i * S + HH,j * S:j * S + WW ]
             ## 计算dw
-            for f in xrange(F):
+            for f in range(F):
                 ### dw 基础运算为 dout * x
                 result = x_padded_computed * (dout[:,f,i,j])[:,None,None,None]
                 dw[f,:,:,:] += np.sum(result, axis = 0)   ## 轴？？
             ## 计算dx_padded
-            for n in xrange(N):
+            for n in range(N):
                 ### 基础运算为 dout * w 
                 ### w:(F, C, HH, WW)
                 result = w[:,:,:,:] * (dout[n, :, i, j])[:,None,None,None]  ##这样转换？
@@ -812,15 +812,15 @@ def max_pool_forward_naive(x, pool_param):
     N, C, H, W = x.shape
     pool_height , pool_width, stride = pool_param['pool_height'], pool_param['pool_width'], pool_param['stride']
 
-    out_H = 1 + (H - pool_height) / stride
-    out_W = 1 + (H - pool_width) / stride
+    out_H = 1 + (H - pool_height) // stride
+    out_W = 1 + (H - pool_width) // stride
 
     ## 构建输出结果的结构
     out = np.zeros((N,C,out_H,out_W))
 
     ## 开始池化
-    for i in xrange(out_H):
-        for j in xrange(out_W):
+    for i in range(out_H):
+        for j in range(out_W):
             # print('h:'+str(i*stride+pool_height))
             # print('w:'+str(j*stride+pool_width))
             out_computed = x[:,:, i*stride:i*stride+pool_height, j*stride:j*stride+pool_width]
@@ -860,14 +860,14 @@ def max_pool_backward_naive(dout, cache):
     N, C, H, W = x.shape
     pool_height , pool_width, stride = pool_param['pool_height'], pool_param['pool_width'], pool_param['stride']
 
-    out_H = 1 + (H - pool_height) / stride
-    out_W = 1 + (H - pool_width) / stride
+    out_H = 1 + (H - pool_height) // stride
+    out_W = 1 + (H - pool_width) // stride
 
 
     dx = np.zeros_like(x)
 
-    for i in xrange(out_H):
-        for j in xrange(out_W):
+    for i in range(out_H):
+        for j in range(out_W):
             ## dout[:,:,i,j] 在x上对应的区域
             x_computed = x[:,:, i*stride:i*stride+pool_height, j*stride:j*stride+pool_width]
             ## dout[:,:,i,j] 在dx上对应的区域
