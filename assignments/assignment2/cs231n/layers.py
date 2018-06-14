@@ -31,8 +31,12 @@ def affine_forward(x, w, b):
     # print(x.shape)
     D = np.prod(x.shape[1:])
     # print(D)
+    # print(x.shape)
     x_ = x.reshape(N,-1)
+    # print(x_.shape)
+    # print(w.shape)
     out = x_.dot(w) +b
+    # print(out.shape)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -412,6 +416,7 @@ def batchnorm_backward_alt(dout, cache):
     return dx, dgamma, dbeta
 
 
+### Layer normalzation 正确性未知
 def layernorm_forward(x, gamma, beta, ln_param):
     """
     Forward pass for layer normalization.
@@ -917,6 +922,21 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     pass
+
+    ## 2维以上的列表，transpose作用如下L:
+    # In [17]: x.transpose(0,1,2).shape
+    # Out[17]: (10L, 2L, 3L)
+    # In [18]: x.transpose(1,0,2).shape
+    # Out[18]: (2L, 10L, 3L)
+    ## 将C分离到最后去
+    N, C, H, W = x.shape
+    BN_input = x.transpose(0,2,3,1)
+    ## 合并前三轴的维度
+    BN_input = BN_input.reshape(N*H*W, C)
+    out, cache =  batchnorm_forward(BN_input, gamma, beta, bn_param)
+    out = out.reshape(N, H, W, C)
+    out = out.transpose(0,3,1,2)
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -947,6 +967,15 @@ def spatial_batchnorm_backward(dout, cache):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     pass
+    N, C, H, W = dout.shape
+    BN_dout = dout.transpose(0,2,3,1)
+    ## 合并前三轴的维度
+    BN_dout = BN_dout.reshape(N*H*W, C)
+    dx, dgamma, dbeta =  batchnorm_backward(BN_dout,cache)
+    dx = dx.reshape(N, H, W, C)
+    dx = dx.transpose(0,3,1,2)
+
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -983,6 +1012,21 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # and layer normalization!                                                # 
     ###########################################################################
     pass
+    ## 参考 https://www.leiphone.com/news/201803/UMVcCCcin2yPxu7t.html
+    N, C, H, W = x.shape
+    ## 对同一个通道上的数据点分组   
+    x = x.reshape(N,G,C//G,H,W)  # // 表示整数除,不四舍五入
+
+    ## 计算均值
+    x_mean = np.mean(x,axis=(2,3,4))[:,:,None,None,None]
+    # print(x_mean.shape)
+    x_var = np.var(x,axis=(2,3,4))[:,:,None,None,None]
+
+    x_hat = x - x_mean / np.sqrt(x_var + eps)
+
+    x_hat = x_hat.reshape(N, C, H, W)
+    out = gamma * x_hat + beta
+    cache = x, x_mean, x_var, x_hat, gamma, beta ,eps, G
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -1009,6 +1053,28 @@ def spatial_groupnorm_backward(dout, cache):
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
     pass
+
+    N, C, H, W = dout.shape
+    x, x_mean, x_var, x_hat, gamma, beta ,eps, G = cache
+
+    dgamma = np.sum(dout * x_hat,axis = 0)
+    dbeta = np.sum(dout,axis = 0)
+
+    ## 计算完dgamma和dbeta后在进行转换
+    dx_hat =  dout * gamma
+
+    #dout = dout.reshape(N,G,C//G,H,W)
+    x = x.reshape(N,G,C//G,H,W)
+    print(x.shape)
+    print(x_mean.shape)
+    print(x_var.shape)
+    print(dx_hat.shape)
+    dx_hat = dx_hat.reshape(N,G,C//G,H,W)
+    dx_var = 0.5 * 1.0 / np.sqrt(x_var + eps) * np.sum(dx_hat * (x - x_mean) ,axis = 0) * (-1.0) / np.square(np.sqrt(x_var + eps))
+    dx_mean =  (-1) * np.sum((dx_hat * (1.0 / np.sqrt(x_var + eps)) + 2 * (x - x_mean) * 1.0/N * np.ones((N,G,C//G,H,W)) *  dx_var),axis = 0)
+    dx = (dx_hat * (1.0 / np.sqrt(x_var + eps))  + 2 * ( x - x_mean ) *  1.0/N * np.ones((N,G,C//G,H,W))  *  dx_var) +  1.0 / N * dx_mean 
+    
+    dx = dx.reshape(N, C, H, W)
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################

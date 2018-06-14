@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*-
 from builtins import object
 import numpy as np
 
@@ -56,20 +57,20 @@ class ThreeLayerConvNet(object):
         
 
         ## 初始化参数
-
+        C,H,W = input_dim
         ## 卷积层部分
         ### 所要做的就是初始化卷积核的权重
         ### 这里和的存储顺序输入保持一致：
         ### 输入的第一维度表示通道，对应卷积层的第一个维度表示的卷积核数目
         ### 第一层的结构为： conv - relu - 2x2 max pool 
-        self.params['W1'] = weight_scale * np.random.randn(num_filters,filter_size,filter_size)  ## 一共有3个维度的参数
+        self.params['W1'] = weight_scale * np.random.randn(num_filters,C,filter_size,filter_size)  ## 一共有4个维度的参数，（卷积核数目，通道数，H,W）
         self.params['b1'] = np.zeros(num_filters)
 
         self.params['W2'] = weight_scale * np.random.randn(num_filters * W/2 * H/2 ,hidden_dim)  
-        self.params['b2'] = np.zeros(num_filters)
+        self.params['b2'] = np.zeros(hidden_dim)
 
         self.params['W3'] = weight_scale * np.random.randn(hidden_dim,num_classes)  
-        self.params['b3'] = np.zeros(num_filters)
+        self.params['b3'] = np.zeros(num_classes)
 
 
         ### 由卷积核卷积的到的卷积层在经过最大池化后和第一个隐藏层连接，两者之间的参数
@@ -121,12 +122,11 @@ class ThreeLayerConvNet(object):
 
         ### 开始前向传播
         # conv - relu - 2x2 max pool 部分
-        out1,cache1 = conv_relu_pool_forward(X,self.params['W1'], self.params['b1'])
+        out1,cache1 = conv_relu_pool_forward(X, self.params['W1'], self.params['b1'], conv_param, pool_param)
         # affine - relu - 部分
         out2,cache2 = affine_relu_forward(out1,self.params['W2'],self.params['b2'])
         # affine - softmax 部分
         scores,cache3_1 = affine_forward(out2,self.params['W3'],self.params['b3'])
-        loss,dout = softmax_loss(scores)
         cache3 = cache3_1
 
         ############################################################################
@@ -148,7 +148,7 @@ class ThreeLayerConvNet(object):
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
         ### 开始反向传播
-        current_dx = None
+        loss,dscores = softmax_loss(scores,y)
 
         dout2, grads['W3'], grads['b3'] = affine_backward(dscores,cache3)
         dout1, grads['W2'], grads['b2'] = affine_relu_backward(dout2,cache2)

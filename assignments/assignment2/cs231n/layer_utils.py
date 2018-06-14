@@ -94,7 +94,7 @@ def conv_relu_pool_forward(x, w, b, conv_param, pool_param):
     # a, conv_cache = conv_forward_fast(x, w, b, conv_param)
     # s, relu_cache = relu_forward(a)
     # out, pool_cache = max_pool_forward_fast(s, pool_param)
-
+    # print(w.shape)
     a, conv_cache = conv_forward_naive(x, w, b, conv_param)
     s, relu_cache = relu_forward(a)
     out, pool_cache = max_pool_forward_naive(s, pool_param)
