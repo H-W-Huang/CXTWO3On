@@ -53,7 +53,30 @@ class ThreeLayerConvNet(object):
         # **the width and height of the input are preserved**. Take a look at      #
         # the start of the loss() function to see how that happens.                #                           
         ############################################################################
-        self.params['W1'] = 
+        
+
+        ## 初始化参数
+
+        ## 卷积层部分
+        ### 所要做的就是初始化卷积核的权重
+        ### 这里和的存储顺序输入保持一致：
+        ### 输入的第一维度表示通道，对应卷积层的第一个维度表示的卷积核数目
+        ### 第一层的结构为： conv - relu - 2x2 max pool 
+        self.params['W1'] = weight_scale * np.random.randn(num_filters,filter_size,filter_size)  ## 一共有3个维度的参数
+        self.params['b1'] = np.zeros(num_filters)
+
+        self.params['W2'] = weight_scale * np.random.randn(num_filters * W/2 * H/2 ,hidden_dim)  
+        self.params['b2'] = np.zeros(num_filters)
+
+        self.params['W3'] = weight_scale * np.random.randn(hidden_dim,num_classes)  
+        self.params['b3'] = np.zeros(num_filters)
+
+
+        ### 由卷积核卷积的到的卷积层在经过最大池化后和第一个隐藏层连接，两者之间的参数
+        ### 第二层的结构为： affine - relu 
+        # self.params['W2'] = weight_scale * np.random.randn()
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -75,7 +98,12 @@ class ThreeLayerConvNet(object):
         # pass conv_param to the forward pass for the convolutional layer
         # Padding and stride chosen to preserve the input spatial size
         filter_size = W1.shape[2]
-        conv_param = {'stride': 1, 'pad': (filter_size - 1) // 2}
+        conv_param = {'stride': 1, 'pad': (filter_size - 1) // 2} 
+        ## S = 1 , P = (F-1)/2 保证了conv的输出尺寸和输入尺寸相同
+        ## 也就是因为这样，结合下边max_pool的width和height，
+        ### 在初始化权重时，对于W2和b2, 其他人才直接地将其设置为 W/2*H/2*filter_nums
+        ### W1 = W
+        ### W2 = (W1 -2)/2 +1 = W1/2 -1 + 1 = W1/2 = W/2
 
         # pass pool_param to the forward pass for the max-pooling layer
         pool_param = {'pool_height': 2, 'pool_width': 2, 'stride': 2}
@@ -90,6 +118,17 @@ class ThreeLayerConvNet(object):
         # cs231n/layer_utils.py in your implementation (already imported).         #
         ############################################################################
         pass
+
+        ### 开始前向传播
+        # conv - relu - 2x2 max pool 部分
+        out1,cache1 = conv_relu_pool_forward(X,self.params['W1'], self.params['b1'])
+        # affine - relu - 部分
+        out2,cache2 = affine_relu_forward(out1,self.params['W2'],self.params['b2'])
+        # affine - softmax 部分
+        scores,cache3_1 = affine_forward(out2,self.params['W3'],self.params['b3'])
+        loss,dout = softmax_loss(scores)
+        cache3 = cache3_1
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -97,7 +136,7 @@ class ThreeLayerConvNet(object):
         if y is None:
             return scores
 
-        loss, grads = 0, {}
+        loss, grads = 0, {} 
         ############################################################################
         # TODO: Implement the backward pass for the three-layer convolutional net, #
         # storing the loss and gradients in the loss and grads variables. Compute  #
@@ -108,7 +147,14 @@ class ThreeLayerConvNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+        ### 开始反向传播
+        current_dx = None
+
+        dout2, grads['W3'], grads['b3'] = affine_backward(dscores,cache3)
+        dout1, grads['W2'], grads['b2'] = affine_relu_backward(dout2,cache2)
+        dx,    grads['W1'], grads['b1'] = conv_relu_pool_backward(dout1,cache1)
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

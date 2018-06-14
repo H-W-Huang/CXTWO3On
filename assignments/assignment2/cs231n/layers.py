@@ -630,6 +630,80 @@ def conv_forward_naive(x, w, b, conv_param):
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
     pass
+
+    ## 读取数据
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape ## w的C和x的C是一样的
+    P , S = conv_param['pad'], conv_param['stride']
+    # 根据公式计算输出结果的shape
+    out_W = (W - WW + 2*P) / S + 1
+    out_H = (H - HH + 2*P) / S + 1
+    ## 构造输出结果的结构
+    ## 一张图卷积成 (F,out_H,out_W)的shape，N张就有N个这样的shape
+    out = np.zeros((N,F,out_H,out_W))
+
+    ##  卷积运算
+    ### 首先根据pad的数值对输入x进行填充
+    ### np.pad(array, pad_width, mode, **kwargs)
+    ### pad_width : {sequence, array_like, int}
+    ### Number of values padded to the edges of each axis.
+    ### ((before_1, after_1), ... (before_N, after_N)) unique pad widths
+    ### for each axis.
+    ### ((before, after),) yields same before and after pad for each axis.
+    ### (pad,) or int is a shortcut for before = after = pad width for all axes.
+    ### 此处输入有四个维度，需要分别为四个维度指定pad的参数
+    ###  (N, F, H', W') 
+    ### N  ： 不需要
+    ### F  ： 不需要
+    ### H' ： 填充pad个像素，各个轴填充的数目一致
+    ### W' ： 填充pad个像素，各个轴填充的数目一致
+    x_padded = np.pad(x, ((0,0),(0,0),(P,P),(P,P)), mode='constant')  ## 默认填充值为0
+
+    ##  开始运算
+    ### 可能这里确实需要先H后W，否则图片会被翻转
+    for i in xrange(out_H):
+        for j in xrange(out_W):
+            ## 从 x_pad 中取出需要参与计算的部分
+            ## 第一个维度：全取
+            ## 第二个维度：全取
+            ## 第三个维度：参与计算部分的H上的起始位置和终止位置,根据步长和卷积核大小确定；
+            ## 第四个维度：参与计算部分的W上的起始位置和终止位置,根据步长和卷积核大小确定；
+            x_padded_computed_h_start = i * S 
+            x_padded_computed_h_end = i * S + HH
+            x_padded_computed_w_start = j * S 
+            x_padded_computed_w_end = j * S + WW
+            x_padded_computed = x_padded[:, :, x_padded_computed_h_start:x_padded_computed_h_end ,x_padded_computed_w_start:x_padded_computed_w_end]
+            ## 一共有F个卷积核，需要计算F次;对N张图都做这样的运算
+            for f in xrange(F):
+                ## 单一一张图的计算计算结果为：
+                ### np.sum(x_padded_computed[i] * w[f,:,:,:])
+                result = x_padded_computed *  w[f,:,:,:]
+                out[:,f,i,j] = np.sum(result,axis=(1,2,3)) ## 对N中的每一个n，计算得到k,i,j位置的数值
+
+    ## 最后对计算结果加上偏置项
+    ## 需要先转换b的格式，以便广播
+    ## b[None,:,None,None]
+    ## 举个例子：
+    ## In [51]: b = np.array([1,2,3])
+    ## In [52]: b.shape
+    ## Out[52]: (3L,)
+    ## In [53]: b[None,:,None,None]
+    ## Out[53]:
+    ## array([[[[1]],
+    ## 
+    ##         [[2]],
+    ## 
+    ##         [[3]]]])
+    ## In [54]: b[None,:,None,None].shape
+    ## Out[54]: (1L, 3L, 1L, 1L)
+    ## In [55]: b.reshape(3,-1)
+    ## Out[55]:
+    ## array([[1],
+    ##        [2],
+    ##        [3]])
+    ## In [56]: b.reshape(3,-1,-1)
+    out = out + (b)[None,:,None,None]
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -655,6 +729,47 @@ def conv_backward_naive(dout, cache):
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
     pass
+
+    x, w, b, conv_param = cache
+    ## 整个过程和前向传播类似，同样需要借助x_padded来完成操作
+    N, C, H, W = x.shape
+    F, _, HH, WW = w.shape ## w的C和x的C是一样的
+    P , S = conv_param['pad'], conv_param['stride']
+    # 根据公式计算输出结果的shape
+    out_W = (W - WW + 2 * P) / S + 1
+    out_H = (H - HH + 2 * P) / S + 1
+
+    x_padded = np.pad(x, ((0,0),(0,0),(P,P),(P,P)), mode='constant')
+    ## 同时，还要确定好输出的shape
+    ## 输出分别为  dx, dw, db
+    ## dx 和 x 的shape相同， dw 和 w 的shape相同， db 和 b 的shape相同
+    dx = np.zeros_like(x)
+    dw = np.zeros_like(w)
+    db = np.zeros_like(b)
+    dx_padded = np.zeros_like(x_padded)  
+    ## 最终的 dx 需要借助 dx_padded来实现
+
+    # (b)[None,:,None,None]
+    ## db = dout，不过shape要一致，通过sum来实现
+    db = np.sum(dout,axis = (0,2,3))
+
+
+    for i in xrange(out_H):
+        for j in xrange(out_W):
+            x_padded_computed = x_padded[:, :, i * S :i * S + HH,j * S:j * S + WW ]
+            ## 计算dw
+            for f in xrange(F):
+                ### dw 基础运算为 dout * x
+                result = x_padded_computed * (dout[:,f,i,j])[:,None,None,None]
+                dw[f,:,:,:] += np.sum(result, axis = 0)   ## 轴？？
+            ## 计算dx_padded
+            for n in xrange(N):
+                ### 基础运算为 dout * w 
+                ### w:(F, C, HH, WW)
+                result = w[:,:,:,:] * (dout[n, :, i, j])[:,None,None,None]  ##这样转换？
+                dx_padded[n, :, i*S:i*S+HH, j*S:j*S+WW ] += np.sum(result,axis=0)
+
+    dx = dx_padded[:,:,P:-P,P:-P]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -685,6 +800,31 @@ def max_pool_forward_naive(x, pool_param):
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
     pass
+
+    ## 计算上和卷积层的计算类似
+    N, C, H, W = x.shape
+    pool_height , pool_width, stride = pool_param['pool_height'], pool_param['pool_width'], pool_param['stride']
+
+    out_H = 1 + (H - pool_height) / stride
+    out_W = 1 + (H - pool_width) / stride
+
+    ## 构建输出结果的结构
+    out = np.zeros((N,C,out_H,out_W))
+
+    ## 开始池化
+    for i in xrange(out_H):
+        for j in xrange(out_W):
+            # print('h:'+str(i*stride+pool_height))
+            # print('w:'+str(j*stride+pool_width))
+            out_computed = x[:,:, i*stride:i*stride+pool_height, j*stride:j*stride+pool_width]
+            # print(out_computed.shape)
+            ## 在 H 和 W范围内取出max，所以使用的维度是2,3
+            result = np.max(out_computed,axis=(2,3))
+
+            out[:,:,i,j] = result
+
+
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -708,6 +848,37 @@ def max_pool_backward_naive(dout, cache):
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
     pass
+    
+    x, pool_param = cache
+    N, C, H, W = x.shape
+    pool_height , pool_width, stride = pool_param['pool_height'], pool_param['pool_width'], pool_param['stride']
+
+    out_H = 1 + (H - pool_height) / stride
+    out_W = 1 + (H - pool_width) / stride
+
+
+    dx = np.zeros_like(x)
+
+    for i in xrange(out_H):
+        for j in xrange(out_W):
+            ## dout[:,:,i,j] 在x上对应的区域
+            x_computed = x[:,:, i*stride:i*stride+pool_height, j*stride:j*stride+pool_width]
+            ## dout[:,:,i,j] 在dx上对应的区域
+            dx_computed = dx[:,:, i*stride:i*stride+pool_height, j*stride:j*stride+pool_width]
+
+            # 借助x_computed得到一个关于max值的Ture/False的array
+            ## 同样是关于2,3轴取的最大值
+            # print(np.max(x_computed, axis=(2,3)).shape)
+            # print(np.max(x_computed, axis=(2,3),keepdims=True).shape)
+            # (3L, 2L)
+            # (3L, 2L, 1L, 1L)
+            flags = np.max(x_computed, axis=(2,3),keepdims=True) == x_computed  ## 未使用keepdims导致计算错误，误差为1.0
+            # print(dout)
+            # print((dout[:,:,i,j])[:,:,None,None].shape) ## (3L, 2L, 1L, 1L)
+            # print(flags.shape)  ## (3L, 2L, 2L, 2L) , x = np.random.randn(3, 2, 8, 8)
+            # print((flags* (dout[:,:,i,j])[:,:,None,None]).shape)   # shape (3L, 2L, 2L, 2L)
+            dx_computed += flags* (dout[:,:,i,j])[:,:,None,None]  ## 最大的那一个数的梯度是打开着的，其他的关闭
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
