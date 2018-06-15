@@ -1020,10 +1020,10 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     x = x.reshape(N,G,C//G,H,W)  # // 表示整数除,不四舍五入
 
     ## 计算均值
-    x_mean = np.mean(x,axis=(0,1))
-    print(x_mean.shape)
+    x_mean = np.mean(x,axis=(2,3,4),keepdims=True)
+    # print(x_mean.shape)
     # print(x.shape)
-    x_var = np.var(x,axis=(0,1))
+    x_var = np.var(x,axis=(2,3,4),keepdims=True)
 
     x_hat = x - x_mean / np.sqrt(x_var + eps)
 
@@ -1060,21 +1060,30 @@ def spatial_groupnorm_backward(dout, cache):
     N, C, H, W = dout.shape
     x, x_mean, x_var, x_hat, gamma, beta ,eps, G = cache
 
-    dgamma = np.sum(dout * x_hat,axis = 0)
-    dbeta = np.sum(dout,axis = 0)
-
-    ## 计算完dgamma和dbeta后在进行转换
+    # print(dout.shape)
+    # dgamma, of shape (C,)
+    ## dout (N, C, H, W)
+    dgamma = np.sum(dout * x_hat,axis = (0,2,3),keepdims=True )
+    dbeta = np.sum(dout, axis = (0,2,3),keepdims=True)
     dx_hat =  dout * gamma
-
-    #dout = dout.reshape(N,G,C//G,H,W)
+    ## 转变shape
     x = x.reshape(N,G,C//G,H,W)
+    x_hat = x_hat.reshape(N,G,C//G,H,W)
+    dx_hat = dx_hat.reshape(N,G,C//G,H,W)
+    
+    # dx还存在错误 2018.06.15
     print(x.shape)
+    print(x_hat.shape)
+    print(dx_hat.shape)
     print(x_mean.shape)
     print(x_var.shape)
-    print(dx_hat.shape)
-    dx_hat = dx_hat.reshape(N,G,C//G,H,W)
-    dx_var = 0.5 * 1.0 / np.sqrt(x_var + eps) * np.sum(dx_hat * (x - x_mean) ,axis = 0) * (-1.0) / np.square(np.sqrt(x_var + eps))
-    dx_mean =  (-1) * np.sum((dx_hat * (1.0 / np.sqrt(x_var + eps)) + 2 * (x - x_mean) * 1.0/N * np.ones((N,G,C//G,H,W)) *  dx_var),axis = 0)
+
+
+
+    dx_var = 0.5 * 1.0 / np.sqrt(x_var + eps) * np.sum(dx_hat * (x - x_mean), axis = (2,3,4), keepdims=True) * (-1.0) / np.square(np.sqrt(x_var + eps))
+    #dx_var = np.sum((0.5 * 1.0 / np.sqrt(x_var + eps) * dx_hat * (x - x_mean) / np.square(np.sqrt(x_var + eps))),axis=(2,3,4),keepdims=True)
+    dx_mean =  (-1) * np.sum((dx_hat * (1.0 / np.sqrt(x_var + eps)) + 2 * (x - x_mean) * 1.0/N * np.ones((N,G,C//G,H,W)) *  dx_var),axis = (2,3,4),keepdims=True)
+    
     dx = (dx_hat * (1.0 / np.sqrt(x_var + eps))  + 2 * ( x - x_mean ) *  1.0/N * np.ones((N,G,C//G,H,W))  *  dx_var) +  1.0 / N * dx_mean 
     
     dx = dx.reshape(N, C, H, W)
