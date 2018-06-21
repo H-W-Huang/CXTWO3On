@@ -141,6 +141,46 @@ class CaptioningRNN(object):
         # in your implementation, if needed.                                       #
         ############################################################################
         pass
+
+
+        ## 正向传播
+        h, cache = None, None
+        ## S1:
+        ## 计算得到初始的 内部隐藏状态 
+        prev_h, cache_affine = affine_forward(features, W_proj, b_proj)
+        ## S2:
+        ## 使用词嵌入层，将caption_in中得词一一转换为向量
+        x, cache_embed = word_embedding_forward(captions_in, W_embed)
+        ## S3:
+        ## 感觉RNN单元类型进行正向传播
+        if self.cell_type == 'rnn':
+            h, cache_rnn = rnn_forward(x, prev_h, Wx, Wh, b)
+        elif self.cell_type == 'lstm':
+            pass
+        ## S4:
+        ## 根据S3的计算结果计算出整个词汇表在每一个时间块上的分值
+        out, cache_temporal_affine = temporal_affine_forward(h, W_vocab, b_vocab)
+        ## S5:         
+        ## 使用softmax计算损失
+        loss, dout = temporal_softmax_loss(out, captions_out, mask)
+
+
+        ## 反向传播
+        dh, dW_vocab, db_vocab = temporal_affine_backward(dout, cache_temporal_affine)
+        dx, dh0, dWx, dWh, db = rnn_backward(dh, cache_rnn)
+        dW_embed = word_embedding_backward(dx, cache_embed)
+        dfeatures, dW_proj, db_proj = affine_backward(dh0, cache_affine)
+
+
+        grads['W_vocab']  = dW_vocab
+        grads['b_vocab'] = db_vocab
+        grads['Wx'] = dWx
+        grads['Wh'] = dWh
+        grads['b'] = db
+        grads['W_embed'] = dW_embed
+        grads['W_vocab'] = dW_vocab
+        grads['b_proj'] = db_proj
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################

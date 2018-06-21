@@ -255,12 +255,12 @@ def word_embedding_forward(x, W):
     out = np.zeros((N, T, D))
 
     ## 遍历minibatch中的每一个单词
-    for n in N:
-        for t in T:
+    for n in range(N):
+        for t in range(T):
             ## 第(n,t)个单词，找出其向量表示
             out[n, t] = W[x[n, t]]
 
-
+    cache = x, W
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -288,8 +288,30 @@ def word_embedding_backward(dout, cache):
     #                                                                            #
     # Note that words can appear more than once in a sequence.                   #
     # HINT: Look up the function np.add.at                                       #
+    # Performs unbuffered in place operation on operand ‘a’                      #
+    # for elements specified by ‘indices’.                                       #
+    # 例子:                                                                      #             
+    # Increment items 0 and 1, and increment item 2 twice:                       #                                                           
+    # a = np.array([1, 2, 3, 4])                                                 #                                   
+    # np.add.at(a, [0, 1, 2, 2], 1)                                              #                                   
+    # print(a)                                                                   #               
+    # >>> array([2, 3, 5, 4])                                                    #                               
     ##############################################################################
     pass
+
+    x, W = cache
+    N, T, _ = dout.shape
+    V, D = W.shape
+
+    dW = np.zeros_like(W)
+
+    for n in range(N):
+        for t in range(T):
+            dW[x[n,t]] += dout[n,t]
+
+    # 可以直接使用下边的函数一句话实现
+    # np.add.at(dW,x,dout)  ### 对于dW, 在dW[N,T]位置，一次性加上 dout
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -491,16 +513,17 @@ def temporal_softmax_loss(x, y, mask, verbose=False):
     """
     A temporal version of softmax loss for use in RNNs. We assume that we are
     making predictions over a vocabulary of size V for each timestep of a
-    timeseries of length T, over a minibatch of size N. The input x gives scores
-    for all vocabulary elements at all timesteps, and y gives the indices of the
-    ground-truth element at each timestep. We use a cross-entropy loss at each
-    timestep, summing the loss over all timesteps and averaging across the
-    minibatch.
+    timeseries of length T, over a minibatch of size N. 
+
+    The input x gives scores for all vocabulary elements at all timesteps, 
+    and y gives the indices of the ground-truth element at each timestep. 
+    We use a cross-entropy loss at each timestep, summing the loss over all timesteps 
+    and averaging across the minibatch.
 
     As an additional complication, we may want to ignore the model output at some
     timesteps, since sequences of different length may have been combined into a
-    minibatch and padded with NULL tokens. The optional mask argument tells us
-    which elements should contribute to the loss.
+    minibatch and padded with NULL tokens. 
+    The optional mask argument tells us which elements should contribute to the loss. 用来屏蔽掉NULL
 
     Inputs:
     - x: Input scores, of shape (N, T, V)
