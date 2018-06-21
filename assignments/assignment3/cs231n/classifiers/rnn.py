@@ -66,7 +66,7 @@ class CaptioningRNN(object):
         self.params['b'] = np.zeros(dim_mul * hidden_dim)
 
         # Initialize output to vocab weights
-        self.params['W_vocab'] = np.random.randn(hidden_dim, vocab_size)
+        self.params['W_vocab'] = np.random.randn(hidden_dim, vocab_size)  # (H,V)
         self.params['W_vocab'] /= np.sqrt(hidden_dim)
         self.params['b_vocab'] = np.zeros(vocab_size)
 
@@ -181,6 +181,9 @@ class CaptioningRNN(object):
         grads['W_proj'] = dW_proj
         grads['b_proj'] = db_proj
 
+
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -190,6 +193,8 @@ class CaptioningRNN(object):
 
     def sample(self, features, max_length=30):
         """
+
+        测试阶段
         Run a test-time forward pass for the model, sampling captions for input
         feature vectors.
 
@@ -246,6 +251,33 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         pass
+
+        ## S1 
+        ## 计算 单步RNN 所需要的参数
+        ## 包括初始化 内部隐藏状态 和 词嵌入输入x
+        prev_h, _ = affine_forward(features, W_proj, b_proj)
+        ## 获取第一个输入
+        ## 首先获取起始符的在词汇表中的下标
+        index = [self._start] * N # 将器其转换为一个长度为N的列表
+        current_x = W_embed[index]
+
+        # prev_h = np.zeros((N, H))
+        for i in range(max_length):           
+            ## S2   
+            if self.cell_type == 'rnn':
+                next_h, _ = rnn_step_forward(current_x, prev_h, Wx, Wh, b) ## next_h (N, H) 
+            elif self.cell_type == 'lstm':
+                pass
+            ## S3
+            scores, _ = affine_forward(next_h, W_vocab, b_vocab)  # (N, H) * (H,V)
+            ## 取出得分最高的单词
+            index  = np.argmax(scores,axis=1)
+
+            captions[:,i] = index
+            prev_h = next_h
+            current_x = W_embed[index]
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
