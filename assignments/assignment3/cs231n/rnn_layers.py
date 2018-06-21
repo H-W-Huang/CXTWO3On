@@ -35,6 +35,11 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # and cache variables respectively.                                          #
     ##############################################################################
     pass
+    
+    z =  prev_h.dot(Wh) + x.dot(Wx) + b
+    next_h = np.tanh(z)
+    cache = (x,prev_h,Wx,Wh,next_h)
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -64,6 +69,21 @@ def rnn_step_backward(dnext_h, cache):
     # of the output value from tanh.                                             #
     ##############################################################################
     pass
+    x, prev_h, Wx, Wh,  next_h = cache
+    ## 上述几个变量的shape分别是 ：
+    ##  (N, D)  (N, H)  (D, H)  (H, H)  (N, H)  (N, H)
+    # z =  prev_h.dot(Wh) + x.dot(Wx) + b
+    # next_h = np.tanh(z)
+    # f(z)' = 1 − (f(z))2
+
+    dz = dnext_h *  ( 1 - np.square(next_h)  )            ## shape : (N, H)
+    db = np.sum(dz, axis = 0)  ## shape :(H)
+    dx = dz.dot(Wx.T)           # Wx * dz 
+    # dprev_h = dz.dot(Wh)   
+    dprev_h = dz.dot(Wh.T) ## 为什么需要转置？
+    dWx = (x.T).dot(dz)
+    dWh = (prev_h.T).dot(dz)
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -94,7 +114,26 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # input data. You should use the rnn_step_forward function that you defined  #
     # above. You can use a for loop to help compute the forward pass.            #
     ##############################################################################
-    pass
+    
+    ### 对输入的 T 个向量进行运算
+    N, T, D = x.shape 
+    H = b.shape[0]
+
+    ## 定义一个空白的h来装结果
+    h = np.zeros((N, T, H))
+
+
+    prev_h = h0
+    for t in range(T):
+        current_x = x[:,t,:]
+        ## 运算
+        next_h, cache_t = rnn_step_forward(current_x, prev_h, Wx, Wh, b)
+        prev_h = next_h
+        ## 填充h结果
+        h[:,t,:] = next_h
+
+    ## 等到最后才来存储cache？
+    cache = (x, h0, Wx, Wh, b, h)
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -107,6 +146,7 @@ def rnn_backward(dh, cache):
 
     Inputs:
     - dh: Upstream gradients of all hidden states, of shape (N, T, H). 
+    ## dh 包含了各个时刻的dh
     
     NOTE: 'dh' contains the upstream gradients produced by the 
     individual loss functions at each timestep, *not* the gradients
@@ -127,6 +167,54 @@ def rnn_backward(dh, cache):
     # defined above. You can use a for loop to help compute the backward pass.   #
     ##############################################################################
     pass
+
+    ## 计算出最终的结果 dx, dh0, dWx, dWh, db
+    ## 需要对每一个时间片t 求取 dx, dht, dWx, dWh, db
+    ## 这里需要注意一下单个时间片计算出 dx, dht, dWx, dWh, db 所需要的变量
+    ## 反复调用 rnn_step_backward(dnext_h, cache): 其中 cache = (x,prev_h,Wx,Wh,next_h)
+    ## 
+
+    N, T, H = dh.shape
+    x, h0, Wx, Wh, b, h = cache 
+
+    ## 通过以上数据构造出 最终输出的基本形态
+    dx = np.zeros_like(x)
+    dh0 = np.zeros((H ,H ))
+    dWx = np.zeros_like(Wx)
+    dWh = np.zeros_like(Wh)
+    db = np.zeros_like(b)
+
+    ## 存储某个时间片内反向传播得到的 dh。在最后一个时间片的情况下，其为0.
+    dh_t = np.zeros((N,H))
+
+    ## 对每一个时间片都进行计算
+    for i in range(T):
+        ## 从最后一个时间片开始
+        t = (T - 1) - i
+
+        ## 构造这个时间片反向传播所需的参数cache_t
+        ## 参数共享，每一个时间块参与计算的参数都是一样的
+        x_t = x[:,t,:]
+
+        ### 特别注意边界 ###
+        if t == 0:
+            prev_h = h0
+        else:
+            prev_h = h[:,t-1,:]
+        next_h = h[:,t,:]
+
+        # dnext_h = dh[:,t,:]   ### ERROR!!!
+        dnext_h = dh[:,t,:] + dh_t  ## 需要再  dh[:,t,:]  的基础上加上上一个时间快计算出来的dh
+        cache_t = x_t, prev_h, Wx, Wh, next_h
+        dx_t, dh_t, dWx_t, dWh_t, db_t = rnn_step_backward(dnext_h,cache_t)
+        
+        dx[:,t,:] = dx_t
+        dWx += dWx_t
+        dWh += dWh_t
+        db  += db_t
+
+    dh0 = dh_t
+    
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -141,11 +229,16 @@ def word_embedding_forward(x, W):
 
     Inputs:
     - x: Integer array of shape (N, T) giving indices of words. Each element idx
-      of x muxt be in the range 0 <= idx < V.
-    - W: Weight matrix of shape (V, D) giving word vectors for all words.
+      of x muxt be in the range 0 <= idx < V. ## 每个batch大小为N，其中每一个序列的长度为T 
+      x 说明了在当前大小为N的minibatch下，每一个单词在词汇表中的下表
+
+    - W: Weight matrix of shape (V, D) giving word vectors for all words.  ## 一共有 V 个词，每一个词的维度为D
+      W 表示大小为V的词汇表中每一个单词的向量表示。
+
 
     Returns a tuple of:
     - out: Array of shape (N, T, D) giving word vectors for all input words.
+    - 为一个minibatch的中的单词在词汇表中找到对应的向量表示
     - cache: Values needed for the backward pass
     """
     out, cache = None, None
@@ -155,6 +248,19 @@ def word_embedding_forward(x, W):
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
     pass
+
+    N, T = x.shape
+    V, D = W.shape
+
+    out = np.zeros((N, T, D))
+
+    ## 遍历minibatch中的每一个单词
+    for n in N:
+        for t in T:
+            ## 第(n,t)个单词，找出其向量表示
+            out[n, t] = W[x[n, t]]
+
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
