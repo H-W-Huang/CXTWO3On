@@ -118,6 +118,7 @@ class CaptioningSolver(object):
 
     def _reset(self):
         """
+        ## 在构造函数里被调用
         Set up some book-keeping variables for optimization. Don't call this
         manually.
         """
@@ -131,6 +132,9 @@ class CaptioningSolver(object):
 
         # Make a deep copy of the optim_config for each parameter
         self.optim_configs = {}
+        ## 取出模型中的所有参数
+        ## self.optim_configs[p] 表示第p个参数的相关优化设置
+        ## 举个例子，  optim_config={'learning_rate': 5e-3,}
         for p in self.model.params:
             d = {k: v for k, v in self.optim_config.items()}
             self.optim_configs[p] = d
@@ -153,11 +157,11 @@ class CaptioningSolver(object):
 
         # Perform a parameter update
         for p, w in self.model.params.items():
-            dw = grads[p]
-            config = self.optim_configs[p]
-            next_w, next_config = self.update_rule(w, dw, config)
-            self.model.params[p] = next_w
-            self.optim_configs[p] = next_config
+            dw = grads[p]               ## 取出当前参数的梯度dw
+            config = self.optim_configs[p]          ## 取出当前参数的优化规则
+            next_w, next_config = self.update_rule(w, dw, config)   ## 调用update_ruled对该参数进行优化，同时优化规则也会发生改变（比如学习率衰退了）
+            self.model.params[p] = next_w  ## 将更新后的参数输入的模型中
+            self.optim_configs[p] = next_config 
 
 
     def check_accuracy(self, X, y, num_samples=None, batch_size=100):

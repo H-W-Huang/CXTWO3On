@@ -178,7 +178,7 @@ class CaptioningRNN(object):
         grads['Wh'] = dWh
         grads['b'] = db
         grads['W_embed'] = dW_embed
-        grads['W_vocab'] = dW_vocab
+        grads['W_proj'] = dW_proj
         grads['b_proj'] = db_proj
 
         ############################################################################
