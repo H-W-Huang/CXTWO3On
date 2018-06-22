@@ -156,7 +156,7 @@ class CaptioningRNN(object):
         if self.cell_type == 'rnn':
             h, cache_rnn = rnn_forward(x, prev_h, Wx, Wh, b)
         elif self.cell_type == 'lstm':
-            pass
+            h, cache_rnn = lstm_forward(x, prev_h, Wx, Wh, b)
         ## S4:
         ## 根据S3的计算结果计算出整个词汇表在每一个时间块上的分值
         out, cache_temporal_affine = temporal_affine_forward(h, W_vocab, b_vocab)
@@ -167,7 +167,10 @@ class CaptioningRNN(object):
 
         ## 反向传播
         dh, dW_vocab, db_vocab = temporal_affine_backward(dout, cache_temporal_affine)
-        dx, dh0, dWx, dWh, db = rnn_backward(dh, cache_rnn)
+        if self.cell_type == 'rnn':
+            dx, dh0, dWx, dWh, db = rnn_backward(dh, cache_rnn)
+        elif self.cell_type == 'lstm':
+            dx, dh0, dWx, dWh, db = lstm_backward(dh, cache_rnn)
         dW_embed = word_embedding_backward(dx, cache_embed)
         dfeatures, dW_proj, db_proj = affine_backward(dh0, cache_affine)
 
@@ -267,7 +270,9 @@ class CaptioningRNN(object):
             if self.cell_type == 'rnn':
                 next_h, _ = rnn_step_forward(current_x, prev_h, Wx, Wh, b) ## next_h (N, H) 
             elif self.cell_type == 'lstm':
-                pass
+                prev_c = np.zeros_like(prev_h)
+                next_h, next_c,  _ = lstm_step_forward(current_x, prev_h, prev_c, Wx, Wh, b)
+                prev_c = next_c
             ## S3
             scores, _ = affine_forward(next_h, W_vocab, b_vocab)  # (N, H) * (H,V)
             ## 取出得分最高的单词

@@ -381,7 +381,7 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     next_c = f * prev_c + i * g
     next_h = o * np.tanh(next_c)
 
-    cache = x, prev_h, prev_c, Wx, Wh, b ,i ,f, o ,g,next_c
+    cache = x, prev_h, prev_c, Wx, Wh, b, i, f, o, g
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -414,7 +414,8 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # the output value from the nonlinearity.                                   #
     #############################################################################
     pass
-    x, prev_h, prev_c, Wx, Wh, b ,i ,f, o ,g,next_c = cache
+    x, prev_h, prev_c, Wx, Wh, b ,i ,f, o ,g = cache
+    next_c = f * prev_c + i * g
 
     # 根据next_h = o * np.tanh(next_c)，可求得 do,
     do = dnext_h * np.tanh(next_c)
@@ -481,6 +482,36 @@ def lstm_forward(x, h0, Wx, Wh, b):
     # You should use the lstm_step_forward function that you just defined.      #
     #############################################################################
     pass
+
+    N, T, D = x.shape
+    _, H = h0 .shape 
+
+    h = np.zeros((N, T, H))
+    c = np.zeros((N, T, H))
+    i = np.zeros((N, T, H))
+    f = np.zeros((N, T, H))
+    o = np.zeros((N, T, H))
+    g = np.zeros((N, T, H))
+
+    prev_h = h0
+    prev_c = np.zeros_like(prev_h)
+
+    for t in range(T):
+        current_x = x[:,t,:]
+        next_h, next_c, cache_t = lstm_step_forward(current_x, prev_h, prev_c, Wx, Wh, b)
+        _, _, _, _, _, _, i_t, f_t, o_t, g_t  = cache_t
+        h[:,t,:] = next_h
+        c[:,t,:] = next_c
+        i[:,t,:] = i_t
+        f[:,t,:] = f_t
+        o[:,t,:] = o_t
+        g[:,t,:] = g_t
+        prev_h = next_h
+        prev_c = next_c
+
+    cache = x, h0, Wx, Wh, b, i, f, o, g, h, c
+
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -508,7 +539,53 @@ def lstm_backward(dh, cache):
     # TODO: Implement the backward pass for an LSTM over an entire timeseries.  #
     # You should use the lstm_step_backward function that you just defined.     #
     #############################################################################
-    pass
+    N, T, H = dh.shape
+
+    x, h0, Wx, Wh, b, i, f, o, g, h, c = cache
+
+
+    ## 初始的 dnext_h 也是 0 
+    dprev_h_t = np.zeros((N,H))
+    dprev_c_t = np.zeros((N,H))
+
+    dx  = np.zeros_like(x)
+    dh0 = np.zeros_like(h0)
+    dWx = np.zeros_like(Wx)
+    dWh = np.zeros_like(Wh)
+    db  = np.zeros_like(b)
+
+    for k in range(T):
+        t = (T - 1) - k
+
+        ##构建反向传播需要的参数
+        # dnext_h = dh[:,t,:]  ## 漏了 dnext_h
+        dnext_h = dh[:,t,:] + dprev_h_t
+        dnext_c = dprev_c_t
+
+        ## 取出当前时间片所需要的 ifog
+        i_t = i[:,t,:]
+        f_t = f[:,t,:]
+        o_t = o[:,t,:]
+        g_t = g[:,t,:]
+        ## 获取 prev_c prev_h 
+        if t == 0 :
+            prev_h = h0
+            prev_c = np.zeros((N,H))
+        else:
+            prev_h = h[:,t-1,:]
+            prev_c = c[:,t-1,:]
+        cache_t = x[:,t,:], prev_h, prev_c, Wx, Wh, b ,i_t ,f_t, o_t ,g_t 
+
+
+        dx_t, dprev_h_t, dprev_c_t, dWx_t, dWh_t, db_t = lstm_step_backward(dnext_h, dnext_c, cache_t)
+        dx[:,t,:] = dx_t
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+
+        
+    dh0 = dprev_h_t
+
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
