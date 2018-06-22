@@ -419,18 +419,25 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # 根据next_h = o * np.tanh(next_c)，可求得 do,
     do = dnext_h * np.tanh(next_c)
     # 根据next_c = f * prev_c + i * g, 可以求df, dprev_c, di, dg
+
+    ## 注意dnext_c 包含两个部分
+    ## 一个是 作为参数直接传入到本方法的 dnext_c
+    ## 另一个是参与 next_h 计算的 next_c, 即 next_h = o * np.tanh(next_c)
+    ## 下面开始更新 dnext_c
+
+    dnext_c = dnext_c + dnext_h * o * (1 - np.square(np.tanh(next_c)))
     df = prev_c * dnext_c
     dprev_c = f * dnext_c
     di =  g * dnext_c
     dg =  i * dnext_c
 
 
-    dai = i * ( 1 - i )
-    daf = f * ( 1 - f )
-    dao = o * ( 1 - o ) ## 根据 sigmoid 的导数计算公式 f′(z) = f(z)(1−f(z))
-    dag = 1 - np.tanh(g)**2
+    dai = di * i * ( 1 - i )
+    daf = df * f * ( 1 - f )
+    dao = do * o * ( 1 - o ) ## 根据 sigmoid 的导数计算公式 f′(z) = f(z)(1−f(z))
+    dag = dg * (1 - g**2)
 
-    da = np.vstack((dai,daf,dao,dag)) # shape (N, 4H)
+    da = np.hstack((dai,daf,dao,dag)) # shape (N, 4H)
 
     ## 根据  a = x.dot(Wx) + prev_h.dot(Wh) + +b 求 
     db = np.sum( da ,axis = 0)
